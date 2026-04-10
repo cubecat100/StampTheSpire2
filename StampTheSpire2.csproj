@@ -1,0 +1,50 @@
+<Project Sdk="Godot.NET.Sdk/4.5.1">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+	<PlatformTarget>x64</PlatformTarget>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>MapStamp</RootNamespace>
+	<AssemblyName>StampTheSpire2</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <Reference Include="sts2">
+      <HintPath>D:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="_inspect\**\*.cs" />
+    <EmbeddedResource Remove="_inspect\**\*" />
+    <None Remove="_inspect\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\*.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <StampImages Include="$(MSBuildProjectDirectory)\stamp_img\*.*" />
+  </ItemGroup>
+
+  <Target Name="CopyToModsFolder" AfterTargets="Build">
+    <PropertyGroup>
+      <ModsFolder>D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\StampTheSpire2</ModsFolder>
+      <SourceDll>$(OutputPath)StampTheSpire2.dll</SourceDll>
+      <SourceManifest>$(MSBuildProjectDirectory)\mod_manifest.json</SourceManifest>
+      <StampImagesTarget>$(ModsFolder)\stamp_img</StampImagesTarget>
+    </PropertyGroup>
+    <Message Text="Copying DLL to STS2 mods folder..." Importance="high" />
+	  
+    <MakeDir Directories="$(ModsFolder)" />
+    <Copy SourceFiles="$(SourceDll)" DestinationFolder="$(ModsFolder)" SkipUnchangedFiles="false" />
+	<Copy SourceFiles="$(SourceManifest)" DestinationFolder="$(ModsFolder)" SkipUnchangedFiles="false" />
+    <MakeDir Directories="$(StampImagesTarget)" />
+    <Copy SourceFiles="@(StampImages)" DestinationFolder="$(StampImagesTarget)" SkipUnchangedFiles="false" />
+	  
+    <Message Text="Successfully copied $(SourceDll) to $(ModsFolder)" Importance="high" />
+  </Target>
+</Project>

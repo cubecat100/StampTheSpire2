@@ -1,0 +1,10 @@
+{
+  "id": "StampTheSpire2",
+  "name": "StampTheSpire2",
+  "author": "CubeCat",
+  "description": "can draw pictures by stamping on the map",
+  "version": "0.1.0",
+  "has_pck": false,
+  "has_dll": true,
+  "affects_gameplay": false
+}
