@@ -23,15 +23,6 @@ public static class Patch_MapScreenOnMapErasingButtonPressed
     }
 }
 
-[HarmonyPatch(typeof(NMapScreen), "OnClearMapDrawingButtonPressed")]
-public static class Patch_MapScreenOnClearMapDrawingButtonPressed
-{
-    public static void Prefix(NMapScreen __instance)
-    {
-        __instance.GetNodeOrNull<MapStampSystem>(MapStampSystem.NodeName)?.DeactivateStampMode();
-    }
-}
-
 [HarmonyPatch(typeof(NMapDrawButton), "SetIsDrawing")]
 public static class Patch_MapDrawButtonSetIsDrawing
 {

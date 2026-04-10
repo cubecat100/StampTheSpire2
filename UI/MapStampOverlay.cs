@@ -2,7 +2,6 @@
 using Godot;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -13,9 +12,19 @@ public partial class MapStampOverlay : Control
 {
     public const string NodeName = "MapStampOverlay";
 
+    private const float BrowserMargin = 16.0f;
+    private const float BrowserMaxWidth = 760.0f;
+    private const float BrowserMaxHeight = 460.0f;
+    private const float BrowserMinWidth = 320.0f;
+    private const float BrowserMinHeight = 240.0f;
+    private const float StampEntryWidth = 112.0f;
+
     private readonly Dictionary<string, Vector2[][]> _strokeCache = [];
     private readonly List<StampTypeDefinition> _stampTypes = [];
     private Control _menuRoot = null!;
+    private GridContainer _stampGrid = null!;
+    private Label _titleLabel = null!;
+    private PanelContainer _browserPanel = null!;
     private NMapScreen _mapScreen = null!;
     private Vector2 _pendingStampPosition;
 
@@ -27,18 +36,8 @@ public partial class MapStampOverlay : Control
         SetAnchorsPreset(LayoutPreset.FullRect);
         _mapScreen = GetParent<NMapScreen>();
 
-        _menuRoot = new Control();
-        _menuRoot.Name = "StampPieMenu";
-        _menuRoot.Visible = false;
-        _menuRoot.MouseFilter = MouseFilterEnum.Pass;
-        AddChild(_menuRoot);
-
-        LoadStampTypes();
-
-        foreach (var stampType in _stampTypes)
-        {
-            _menuRoot.AddChild(CreateMenuButton(stampType));
-        }
+        BuildStampBrowser();
+        RebuildStampEntries();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -48,26 +47,30 @@ public partial class MapStampOverlay : Control
             return;
         }
 
-        if (@event is not InputEventMouseButton mouseButton)
-        {
-            return;
-        }
-
-        if (mouseButton.Pressed == false)
-        {
-            return;
-        }
-
-        if (mouseButton.ButtonIndex == MouseButton.Left || mouseButton.ButtonIndex == MouseButton.Right)
+        if (@event is InputEventKey keyEvent && keyEvent.Pressed == true && keyEvent.Keycode == Key.Escape)
         {
             HidePieMenu();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event is not InputEventMouseButton mouseButton || mouseButton.Pressed == false)
+        {
+            return;
+        }
+
+        if (_browserPanel.GetGlobalRect().HasPoint(mouseButton.Position) == false)
+        {
+            HidePieMenu();
+            GetViewport().SetInputAsHandled();
         }
     }
 
     public void ShowPieMenu(Vector2 screenPosition)
     {
         _pendingStampPosition = screenPosition;
-        _menuRoot.Position = screenPosition;
+        RebuildStampEntries();
+        UpdateBrowserLayout(screenPosition);
         _menuRoot.Visible = true;
     }
 
@@ -88,9 +91,97 @@ public partial class MapStampOverlay : Control
         DrawStrokes("debug", screenPosition, debugStrokes);
     }
 
+    public void ClearStrokeCache()
+    {
+        _strokeCache.Clear();
+    }
+
+    private void BuildStampBrowser()
+    {
+        _menuRoot = new Control();
+        _menuRoot.Name = "StampBrowserRoot";
+        _menuRoot.Visible = false;
+        _menuRoot.MouseFilter = MouseFilterEnum.Ignore;
+        _menuRoot.SetAnchorsPreset(LayoutPreset.FullRect);
+        AddChild(_menuRoot);
+
+        _browserPanel = new PanelContainer();
+        _browserPanel.Name = "StampBrowserPanel";
+        _browserPanel.MouseFilter = MouseFilterEnum.Stop;
+        _browserPanel.Size = new Vector2(BrowserMaxWidth, BrowserMaxHeight);
+        _menuRoot.AddChild(_browserPanel);
+
+        var margins = new MarginContainer();
+        margins.AddThemeConstantOverride("margin_left", 14);
+        margins.AddThemeConstantOverride("margin_top", 14);
+        margins.AddThemeConstantOverride("margin_right", 14);
+        margins.AddThemeConstantOverride("margin_bottom", 14);
+        _browserPanel.AddChild(margins);
+
+        var layout = new VBoxContainer();
+        layout.Name = "Layout";
+        layout.AddThemeConstantOverride("separation", 10);
+        margins.AddChild(layout);
+
+        _titleLabel = new Label();
+        _titleLabel.Name = "Title";
+        _titleLabel.Text = "Stamps";
+        _titleLabel.AddThemeFontSizeOverride("font_size", 18);
+        layout.AddChild(_titleLabel);
+
+        var scroll = new ScrollContainer();
+        scroll.Name = "Scroll";
+        scroll.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        scroll.SizeFlagsVertical = SizeFlags.ExpandFill;
+        layout.AddChild(scroll);
+
+        _stampGrid = new GridContainer();
+        _stampGrid.Name = "StampGrid";
+        _stampGrid.Columns = 4;
+        _stampGrid.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _stampGrid.AddThemeConstantOverride("h_separation", 10);
+        _stampGrid.AddThemeConstantOverride("v_separation", 10);
+        scroll.AddChild(_stampGrid);
+    }
+
     private void HidePieMenu()
     {
         _menuRoot.Visible = false;
+    }
+
+    private void RebuildStampEntries()
+    {
+        LoadStampTypes();
+        ClearStampGrid();
+
+        if (_stampTypes.Count == 0)
+        {
+            _titleLabel.Text = "Stamps (0)";
+
+            var emptyLabel = new Label();
+            emptyLabel.Name = "EmptyState";
+            emptyLabel.Text = "No stamp images found in stamp_img";
+            emptyLabel.HorizontalAlignment = HorizontalAlignment.Center;
+            emptyLabel.CustomMinimumSize = new Vector2(240.0f, 64.0f);
+            _stampGrid.AddChild(emptyLabel);
+            return;
+        }
+
+        _titleLabel.Text = $"Stamps ({_stampTypes.Count})";
+
+        foreach (var stampType in _stampTypes)
+        {
+            _stampGrid.AddChild(CreateMenuButton(stampType));
+        }
+    }
+
+    private void ClearStampGrid()
+    {
+        foreach (Node child in _stampGrid.GetChildren())
+        {
+            _stampGrid.RemoveChild(child);
+            child.QueueFree();
+        }
     }
 
     private Button CreateMenuButton(StampTypeDefinition stampType)
@@ -99,20 +190,25 @@ public partial class MapStampOverlay : Control
         button.Name = $"StampType_{stampType.Id}";
         button.Text = string.Empty;
         button.TooltipText = stampType.Label;
-        button.Size = new Vector2(112.0f, 112.0f);
-        button.Position = stampType.Offset - (button.Size / 2.0f);
+        button.CustomMinimumSize = new Vector2(StampEntryWidth, 104.0f);
         button.FocusMode = FocusModeEnum.None;
+        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         button.Pressed += () => OnStampTypePressed(stampType);
+
+        var content = new CenterContainer();
+        content.Name = "Content";
+        content.SetAnchorsPreset(LayoutPreset.FullRect);
+        content.MouseFilter = MouseFilterEnum.Ignore;
+        button.AddChild(content);
 
         var icon = new TextureRect();
         icon.Name = "Icon";
         icon.Texture = MapStampIcons.GetMenuIcon(stampType.ImageFileName);
-        icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+        icon.CustomMinimumSize = new Vector2(88.0f, 88.0f);
+        icon.ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional;
         icon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
-        icon.Size = new Vector2(80.0f, 80.0f);
-        icon.Position = new Vector2(16.0f, 16.0f);
         icon.MouseFilter = MouseFilterEnum.Ignore;
-        button.AddChild(icon);
+        content.AddChild(icon);
 
         return button;
     }
@@ -140,43 +236,37 @@ public partial class MapStampOverlay : Control
         DrawStrokes(stampType.Id, screenPosition, strokes);
     }
 
-    public void ClearStrokeCache()
-    {
-        _strokeCache.Clear();
-    }
-
     private void LoadStampTypes()
     {
         _stampTypes.Clear();
 
         var imageFiles = MapStampIcons.GetAvailableStampImageFiles();
-        for (int i = 0; i < imageFiles.Count; i++)
+        foreach (var imageFileName in imageFiles)
         {
-            var imageFileName = imageFiles[i];
             var id = Path.GetFileNameWithoutExtension(imageFileName);
-            _stampTypes.Add(new StampTypeDefinition(id, id, imageFileName, GetMenuOffset(i, imageFiles.Count)));
+            _stampTypes.Add(new StampTypeDefinition(id, id, imageFileName, Vector2.Zero));
         }
 
         Log.Warn($"[MapStamp] Loaded stamp images: count={_stampTypes.Count}");
     }
 
-    private static Vector2 GetMenuOffset(int index, int count)
+    private void UpdateBrowserLayout(Vector2 screenPosition)
     {
-        if (count <= 1)
-        {
-            return Vector2.Zero;
-        }
+        var viewportSize = GetViewportRect().Size;
+        var browserWidth = Mathf.Clamp(viewportSize.X - (BrowserMargin * 2.0f), BrowserMinWidth, BrowserMaxWidth);
+        var browserHeight = Mathf.Clamp(viewportSize.Y - (BrowserMargin * 2.0f), BrowserMinHeight, BrowserMaxHeight);
+        _browserPanel.Size = new Vector2(browserWidth, browserHeight);
 
-        if (count == 2)
-        {
-            return index == 0 ? new Vector2(-72.0f, 0.0f) : new Vector2(72.0f, 0.0f);
-        }
+        var columns = Mathf.Max(2, Mathf.FloorToInt((browserWidth - 40.0f) / StampEntryWidth));
+        _stampGrid.Columns = columns;
 
-        const float halfPi = 1.5707964f;
-        const float tau = 6.2831855f;
-        var radius = count <= 5 ? 108.0f : 144.0f;
-        var angle = (-halfPi) + ((tau / count) * index);
-        return new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius;
+        var minX = BrowserMargin;
+        var minY = BrowserMargin;
+        var maxX = Mathf.Max(BrowserMargin, viewportSize.X - browserWidth - BrowserMargin);
+        var maxY = Mathf.Max(BrowserMargin, viewportSize.Y - browserHeight - BrowserMargin);
+        var targetX = Mathf.Clamp(screenPosition.X - (browserWidth * 0.5f), minX, maxX);
+        var targetY = Mathf.Clamp(screenPosition.Y - (browserHeight * 0.5f), minY, maxY);
+        _browserPanel.Position = new Vector2(targetX, targetY);
     }
 
     private void DrawStrokes(string stampId, Vector2 screenPosition, Vector2[][] strokes)
