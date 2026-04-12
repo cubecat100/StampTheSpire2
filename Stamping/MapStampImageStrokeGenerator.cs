@@ -67,7 +67,7 @@ public static class MapStampImageStrokeGenerator
         }
 
         var threshold = foregroundCount > 0 ? ComputeOtsuThreshold(histogram, foregroundCount) : 0.5f;
-        var strokes = new List<Vector2[]>();
+        var selectedMask = new bool[width, height];
 
         for (int y = 0; y < height; y++)
         {
@@ -80,7 +80,7 @@ public static class MapStampImageStrokeGenerator
 
                 if (edgeMask[x, y] == true)
                 {
-                    strokes.Add(CreateDotStroke(x, y, width, height, effectiveScale));
+                    selectedMask[x, y] = true;
                     continue;
                 }
 
@@ -90,7 +90,40 @@ public static class MapStampImageStrokeGenerator
                     continue;
                 }
 
-                strokes.Add(CreateDotStroke(x, y, width, height, effectiveScale));
+                selectedMask[x, y] = true;
+            }
+        }
+
+        return BuildConnectedRowStrokes(selectedMask, effectiveScale);
+    }
+
+    private static Vector2[][] BuildConnectedRowStrokes(bool[,] selectedMask, float effectiveScale)
+    {
+        var width = selectedMask.GetLength(0);
+        var height = selectedMask.GetLength(1);
+        var strokes = new List<Vector2[]>();
+
+        for (int y = 0; y < height; y++)
+        {
+            var x = 0;
+            while (x < width)
+            {
+                if (selectedMask[x, y] == false)
+                {
+                    x++;
+                    continue;
+                }
+
+                var startX = x;
+                x++;
+
+                while (x < width && selectedMask[x, y] == true)
+                {
+                    x++;
+                }
+
+                var endX = x - 1;
+                strokes.Add(CreateRowStroke(startX, endX, y, width, height, effectiveScale));
             }
         }
 
@@ -400,6 +433,78 @@ public static class MapStampImageStrokeGenerator
             center + new Vector2(-(DotHalfLength * effectiveScale), 0.0f),
             center + new Vector2(DotHalfLength * effectiveScale, 0.0f),
         ];
+    }
+
+    private static Vector2[] CreateRowStroke(int startX, int endX, int y, int width, int height, float effectiveScale)
+    {
+        if (startX == endX)
+        {
+            return CreateDotStroke(startX, y, width, height, effectiveScale);
+        }
+
+        if ((endX - startX) >= 2)
+        {
+            var midX = GetRandomizedMidpointX(startX, endX, y, width, height);
+            var startPoint = ToOffset(midX, y, width, height, effectiveScale);
+            var leftPoint = ToOffset(startX, y, width, height, effectiveScale);
+            var rightPoint = ToOffset(endX, y, width, height, effectiveScale);
+
+            if (ShouldTraverseRightFirst(startX, endX, y, width, height) == true)
+            {
+                return
+                [
+                    startPoint,
+                    rightPoint,
+                    leftPoint,
+                ];
+            }
+
+            return
+            [
+                startPoint,
+                leftPoint,
+                rightPoint,
+            ];
+        }
+
+        return
+        [
+            ToOffset(startX, y, width, height, effectiveScale),
+            ToOffset(endX, y, width, height, effectiveScale),
+        ];
+    }
+
+    private static int GetRandomizedMidpointX(int startX, int endX, int y, int width, int height)
+    {
+        var innerStart = startX + 1;
+        var innerEnd = endX - 1;
+        if (innerStart > innerEnd)
+        {
+            return (startX + endX) / 2;
+        }
+
+        var range = (innerEnd - innerStart) + 1;
+        var hash = HashRow(startX, endX, y, width, height);
+        return innerStart + Math.Abs(hash % range);
+    }
+
+    private static bool ShouldTraverseRightFirst(int startX, int endX, int y, int width, int height)
+    {
+        return (HashRow(startX, endX, y, width, height) & 1) == 0;
+    }
+
+    private static int HashRow(int startX, int endX, int y, int width, int height)
+    {
+        unchecked
+        {
+            var hash = 17;
+            hash = (hash * 31) + startX;
+            hash = (hash * 31) + endX;
+            hash = (hash * 31) + y;
+            hash = (hash * 31) + width;
+            hash = (hash * 31) + height;
+            return hash;
+        }
     }
 
     private static Vector2 ToOffset(int x, int y, int width, int height, float effectiveScale)
