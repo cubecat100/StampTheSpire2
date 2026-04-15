@@ -279,24 +279,31 @@ public partial class MapStampOverlay : Control
         }
 
         drawings.SetDrawingModeLocal(DrawingMode.Drawing);
-
-        foreach (var stroke in strokes)
+        try
         {
-            if (stroke.Length == 0)
+            foreach (var stroke in strokes)
             {
-                continue;
+                if (stroke.Length == 0)
+                {
+                    continue;
+                }
+
+                var start = ToDrawingPosition(screenPosition + stroke[0]);
+                drawings.BeginLineLocal(start, DrawingMode.Drawing);
+
+                for (int i = 1; i < stroke.Length; i++)
+                {
+                    var point = ToDrawingPosition(screenPosition + stroke[i]);
+                    drawings.UpdateCurrentLinePositionLocal(point);
+                }
+
+                drawings.StopLineLocal();
             }
-
-            var start = ToDrawingPosition(screenPosition + stroke[0]);
-            drawings.BeginLineLocal(start, DrawingMode.Drawing);
-
-            for (int i = 1; i < stroke.Length; i++)
-            {
-                var point = ToDrawingPosition(screenPosition + stroke[i]);
-                drawings.UpdateCurrentLinePositionLocal(point);
-            }
-
-            drawings.StopLineLocal();
+        }
+        finally
+        {
+            drawings.SetDrawingModeLocal(DrawingMode.None);
+            _mapScreen.Call("UpdateDrawingButtonStates");
         }
 
         Log.Warn($"[MapStamp] Drew strokes: id={stampId} strokeCount={strokes.Length} screen={screenPosition}");

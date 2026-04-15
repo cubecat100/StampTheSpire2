@@ -16,7 +16,7 @@ public static class Patch_MapScreenProcessMouseDrawingEvent
             return true;
         }
 
-        if (mouseButton.Pressed == false || mouseButton.ButtonIndex != MouseButton.Right)
+        if (mouseButton.Pressed == false)
         {
             return true;
         }
@@ -25,6 +25,13 @@ public static class Patch_MapScreenProcessMouseDrawingEvent
         if (system?.IsStampModeActive != true)
         {
             return true;
+        }
+
+        if (mouseButton.ButtonIndex == MouseButton.Left)
+        {
+            system.DeactivateStampMode();
+            Log.Warn($"[MapStamp] Deactivated stamp mode from left-click: screen={mouseButton.Position}");
+            return false;
         }
 
         if (mouseButton.ButtonIndex != MouseButton.Right)
