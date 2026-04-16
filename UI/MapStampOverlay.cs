@@ -108,6 +108,7 @@ public partial class MapStampOverlay : Control
         _browserPanel = new PanelContainer();
         _browserPanel.Name = "StampBrowserPanel";
         _browserPanel.MouseFilter = MouseFilterEnum.Stop;
+        _browserPanel.MouseForcePassScrollEvents = false;
         _browserPanel.Size = new Vector2(BrowserMaxWidth, BrowserMaxHeight);
         _menuRoot.AddChild(_browserPanel);
 
@@ -133,12 +134,14 @@ public partial class MapStampOverlay : Control
         scroll.Name = "Scroll";
         scroll.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         scroll.SizeFlagsVertical = SizeFlags.ExpandFill;
+        scroll.MouseForcePassScrollEvents = false;
         layout.AddChild(scroll);
 
         _stampGrid = new GridContainer();
         _stampGrid.Name = "StampGrid";
         _stampGrid.Columns = 4;
         _stampGrid.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _stampGrid.MouseForcePassScrollEvents = false;
         _stampGrid.AddThemeConstantOverride("h_separation", 10);
         _stampGrid.AddThemeConstantOverride("v_separation", 10);
         scroll.AddChild(_stampGrid);
