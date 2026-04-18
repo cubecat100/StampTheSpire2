@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using MegaCrit.Sts2.Core.Logging;
 using System;
 using System.Collections.Generic;
 
@@ -15,12 +16,20 @@ public static class MapStampImageStrokeGenerator
     private const float PixelScale = 2.8f;
     private const float DotHalfLength = 0.42f;
 
-    public static Vector2[][] Generate(Image sourceImage, float scaleMultiplier)
+    public static Vector2[][] Generate(Image sourceImage, float scaleMultiplier, string? debugName = null)
     {
+        if (sourceImage.GetWidth() <= 0 || sourceImage.GetHeight() <= 0)
+        {
+            Log.Warn($"[MapStamp] Stamp source image is empty before stroke generation: file={debugName ?? "<unknown>"} size={sourceImage.GetWidth()}x{sourceImage.GetHeight()}");
+            return [];
+        }
+
         var foregroundMask = BuildForegroundMask(sourceImage);
+        var foregroundPixelCount = CountTrue(foregroundMask);
         var foregroundBounds = FindForegroundBounds(foregroundMask);
         if (foregroundBounds.Size.X <= 0 || foregroundBounds.Size.Y <= 0)
         {
+            Log.Warn($"[MapStamp] No foreground bounds found during stroke generation: file={debugName ?? "<unknown>"} imageSize={sourceImage.GetWidth()}x{sourceImage.GetHeight()} foregroundPixels={foregroundPixelCount}");
             return [];
         }
 
@@ -29,7 +38,17 @@ public static class MapStampImageStrokeGenerator
         raster.Resize(targetSize.X, targetSize.Y, Image.Interpolation.Cubic);
 
         var resizedMask = ResampleMask(foregroundMask, foregroundBounds, targetSize.X, targetSize.Y);
-        return BuildDotStrokes(raster, resizedMask, BaseStampScale);
+        var strokes = BuildDotStrokes(raster, resizedMask, BaseStampScale);
+        if (strokes.Length == 0)
+        {
+            Log.Warn($"[MapStamp] Stroke generation produced no strokes: file={debugName ?? "<unknown>"} imageSize={sourceImage.GetWidth()}x{sourceImage.GetHeight()} foregroundPixels={foregroundPixelCount} bounds={foregroundBounds} targetSize={targetSize}");
+        }
+        else
+        {
+            Log.Warn($"[MapStamp] Stroke generation succeeded: file={debugName ?? "<unknown>"} strokes={strokes.Length} foregroundPixels={foregroundPixelCount} bounds={foregroundBounds} targetSize={targetSize}");
+        }
+
+        return strokes;
     }
 
     private static Vector2[][] BuildDotStrokes(Image raster, bool[,] foregroundMask, float effectiveScale)
@@ -423,6 +442,23 @@ public static class MapStampImageStrokeGenerator
         }
 
         return false;
+    }
+
+    private static int CountTrue(bool[,] mask)
+    {
+        var count = 0;
+        for (int y = 0; y < mask.GetLength(1); y++)
+        {
+            for (int x = 0; x < mask.GetLength(0); x++)
+            {
+                if (mask[x, y] == true)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private static Vector2[] CreateDotStroke(int x, int y, int width, int height, float effectiveScale)

@@ -69,9 +69,17 @@ public partial class MapStampOverlay : Control
     public void ShowPieMenu(Vector2 screenPosition)
     {
         _pendingStampPosition = screenPosition;
-        RebuildStampEntries();
-        UpdateBrowserLayout(screenPosition);
         _menuRoot.Visible = true;
+        try
+        {
+            RebuildStampEntries();
+            UpdateBrowserLayout(screenPosition);
+        }
+        catch (System.Exception ex)
+        {
+            ShowBrowserErrorState("Failed to open stamps");
+            Log.Warn($"[MapStamp] Failed to open stamp browser: {ex}");
+        }
     }
 
     public void ClosePieMenu()
@@ -171,10 +179,34 @@ public partial class MapStampOverlay : Control
         }
 
         _titleLabel.Text = $"Stamps ({_stampTypes.Count})";
+        var successCount = 0;
+        var failureCount = 0;
 
         foreach (var stampType in _stampTypes)
         {
-            _stampGrid.AddChild(CreateMenuButton(stampType));
+            try
+            {
+                _stampGrid.AddChild(CreateMenuButton(stampType));
+                successCount++;
+            }
+            catch (System.Exception ex)
+            {
+                failureCount++;
+                Log.Warn($"[MapStamp] Failed to create stamp browser entry: file={stampType.ImageFileName} error={ex.Message}");
+            }
+        }
+
+        Log.Warn($"[MapStamp] Stamp browser image load summary: total={_stampTypes.Count} success={successCount} failed={failureCount}");
+
+        if (successCount == 0)
+        {
+            ShowBrowserErrorState("No usable stamp images");
+            return;
+        }
+
+        if (failureCount > 0)
+        {
+            _titleLabel.Text = $"Stamps ({successCount}/{_stampTypes.Count})";
         }
     }
 
@@ -228,15 +260,26 @@ public partial class MapStampOverlay : Control
         var system = _mapScreen.GetNodeOrNull<MapStampSystem>(MapStampSystem.NodeName);
         var scaleMultiplier = system?.CurrentStampScaleMultiplier ?? 1.0f;
         var cacheKey = CreateStrokeCacheKey(stampType.ImageFileName, scaleMultiplier);
-
-        if (_strokeCache.TryGetValue(cacheKey, out var strokes) == false)
+        try
         {
-            var sourceImage = MapStampIcons.GetStampSourceImage(stampType.ImageFileName);
-            strokes = MapStampImageStrokeGenerator.Generate(sourceImage, scaleMultiplier);
-            _strokeCache[cacheKey] = strokes;
-        }
+            if (_strokeCache.TryGetValue(cacheKey, out var strokes) == false)
+            {
+                var sourceImage = MapStampIcons.GetStampSourceImage(stampType.ImageFileName);
+                strokes = MapStampImageStrokeGenerator.Generate(sourceImage, scaleMultiplier, stampType.ImageFileName);
+                _strokeCache[cacheKey] = strokes;
+            }
 
-        DrawStrokes(stampType.Id, screenPosition, strokes);
+            if (strokes.Length == 0)
+            {
+                Log.Warn($"[MapStamp] No drawable strokes available for stamp: id={stampType.Id} file={stampType.ImageFileName}");
+            }
+
+            DrawStrokes(stampType.Id, screenPosition, strokes);
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warn($"[MapStamp] Failed to draw stamp: id={stampType.Id} file={stampType.ImageFileName} error={ex}");
+        }
     }
 
     private void LoadStampTypes()
@@ -310,6 +353,21 @@ public partial class MapStampOverlay : Control
         }
 
         Log.Warn($"[MapStamp] Drew strokes: id={stampId} strokeCount={strokes.Length} screen={screenPosition}");
+    }
+
+    private void ShowBrowserErrorState(string message)
+    {
+        ClearStampGrid();
+        _titleLabel.Text = "Stamps";
+
+        var errorLabel = new Label();
+        errorLabel.Name = "ErrorState";
+        errorLabel.Text = message;
+        errorLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        errorLabel.VerticalAlignment = VerticalAlignment.Center;
+        errorLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        errorLabel.CustomMinimumSize = new Vector2(240.0f, 64.0f);
+        _stampGrid.AddChild(errorLabel);
     }
 
     private Vector2 ToDrawingPosition(Vector2 screenPosition)

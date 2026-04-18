@@ -10,6 +10,18 @@
 
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <Reference Include="System.Drawing.Common">
+      <HintPath>C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Drawing.Common.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Private.Windows.Core">
+      <HintPath>C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Private.Windows.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Private.Windows.GdiPlus">
+      <HintPath>C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Private.Windows.GdiPlus.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="sts2">
       <HintPath>D:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll</HintPath>
       <Private>False</Private>
@@ -28,6 +40,9 @@
 
   <ItemGroup>
     <StampImages Include="$(MSBuildProjectDirectory)\stamp_img\*.*" />
+    <RuntimeSupportAssemblies Include="C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Drawing.Common.dll" />
+    <RuntimeSupportAssemblies Include="C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Private.Windows.Core.dll" />
+    <RuntimeSupportAssemblies Include="C:\Users\mnbvc\.nuget\packages\system.drawing.common\10.0.0-preview.7.25380.108\lib\net9.0\System.Private.Windows.GdiPlus.dll" />
   </ItemGroup>
 
   <Target Name="CopyToModsFolder" AfterTargets="Build">
@@ -42,6 +57,7 @@
     <MakeDir Directories="$(ModsFolder)" />
     <Copy SourceFiles="$(SourceDll)" DestinationFolder="$(ModsFolder)" SkipUnchangedFiles="false" />
 	<Copy SourceFiles="$(SourceManifest)" DestinationFolder="$(ModsFolder)" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(RuntimeSupportAssemblies)" DestinationFolder="$(ModsFolder)" SkipUnchangedFiles="false" />
     <MakeDir Directories="$(StampImagesTarget)" />
     <Copy SourceFiles="@(StampImages)" DestinationFolder="$(StampImagesTarget)" SkipUnchangedFiles="false" />
 	  
