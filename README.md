@@ -6,6 +6,14 @@ StampTheSpire2 is an image-based map stamping mod for Slay the Spire 2.
 
 Instead of drawing every line by hand, you can open a stamp menu, choose the image you want, and place it directly on the map.
 
+<br>
+
+### [download]
+https://github.com/cubecat100/StampTheSpire2/releases
+
+<br>
+
+
 ## Features
 
 - Adds a stamp button to the map drawing toolbar
